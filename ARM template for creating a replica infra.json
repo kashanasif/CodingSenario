@@ -94,14 +94,14 @@
             },
             "site1_pip": {
                 "type": "String",
-                "defaultValue": "100.14.56.90",
+                "defaultValue": "-ip",
                 "metadata": {
                     "description": "The public IP address of VPN device of site 1"
                 }
             },
             "site2_pip": {
                 "type": "String",
-                "defaultValue": "39.54.78.100",
+                "defaultValue": "-ip",
                 "metadata": {
                     "description": "The public IP address of VPN device of site 2"
                 }
