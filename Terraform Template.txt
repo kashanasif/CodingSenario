@@ -1,0 +1,225 @@
+
+terraform import azurerm_sentinel_data_connector_azure_advanced_threat_protection.example /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/group1/providers/Microsoft.OperationalInsights/workspaces/workspace1/providers/Microsoft.SecurityInsights/dataConnectors/dc1
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "k8s" {
+    name     = var.resource_group_name
+    location = var.location
+}
+
+resource "random_id" "log_analytics_workspace_name_suffix" {
+    byte_length = 8
+}
+
+resource "azurerm_log_analytics_workspace" "test" {
+    # The WorkSpace name has to be unique across the whole of azure, not just the current subscription/tenant.
+    name                = "${var.log_analytics_workspace_name}-${random_id.log_analytics_workspace_name_suffix.dec}"
+    location            = var.log_analytics_workspace_location
+    resource_group_name = azurerm_resource_group.k8s.name
+    sku                 = var.log_analytics_workspace_sku
+}
+
+resource "azurerm_log_analytics_solution" "test" {
+    solution_name         = "ContainerInsights"
+    location              = azurerm_log_analytics_workspace.test.location
+    resource_group_name   = azurerm_resource_group.k8s.name
+    workspace_resource_id = azurerm_log_analytics_workspace.test.id
+    workspace_name        = azurerm_log_analytics_workspace.test.name
+
+    plan {
+        publisher = "Microsoft"
+        product   = "OMSGallery/ContainerInsights"
+    }
+}
+
+
+resource "azurerm_resource_group" "main" {
+  name     = "example-resources"
+  location = "West Europe"
+}
+
+resource "azurerm_storage_account" "to_monitor" {
+  name                     = "examplestorageaccount"
+  resource_group_name      = azurerm_resource_group.main.name
+  location                 = azurerm_resource_group.main.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+resource "azurerm_monitor_action_group" "main" {
+  name                = "example-actiongroup"
+  resource_group_name = azurerm_resource_group.main.name
+  short_name          = "exampleact"
+
+  webhook_receiver {
+    name        = "callmyapi"
+    service_uri = "http://example.com/alert"
+  }
+}
+
+resource "azurerm_monitor_metric_alert" "example" {
+  name                = "example-metricalert"
+  resource_group_name = azurerm_resource_group.main.name
+  scopes              = [azurerm_storage_account.to_monitor.id]
+  description         = "Action will be triggered when Transactions count is greater than 50."
+
+  criteria {
+    metric_namespace = "Microsoft.Storage/storageAccounts"
+    metric_name      = "Transactions"
+    aggregation      = "Total"
+    operator         = "GreaterThan"
+    threshold        = 50
+
+    dimension {
+      name     = "ApiName"
+      operator = "Include"
+      values   = ["*"]
+    }
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.main.id
+  }
+}
+
+resource "azurerm_sentinel_data_connector_azure_advanced_threat_protection" "example" {
+  name                       = "example"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
+}
+
+variable "client_id" {}
+variable "client_secret" {}
+
+variable "agent_count" {
+    default = 3
+}
+
+variable "ssh_public_key" {
+    default = "~/.ssh/id_rsa.pub"
+}
+
+variable "dns_prefix" {
+    default = "k8stest"
+}
+
+variable cluster_name {
+    default = "k8stest"
+}
+
+variable resource_group_name {
+    default = "azure-k8stest"
+}
+
+variable location {
+    default = "Central US"
+}
+
+variable log_analytics_workspace_name {
+    default = "testLogAnalyticsWorkspaceName"
+}
+
+# refer https://azure.microsoft.com/global-infrastructure/services/?products=monitor for log analytics available regions
+variable log_analytics_workspace_location {
+    default = "eastus"
+}
+
+# refer https://azure.microsoft.com/pricing/details/monitor/ for log analytics pricing 
+variable log_analytics_workspace_sku {
+    default = "PerGB2018"
+}
+
+resource "azurerm_resource_group" "example" {
+  name     = "example-resources"
+  location = "West Europe"
+}
+
+resource "azurerm_log_analytics_workspace" "example" {
+  name                = "example-workspace"
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
+  sku                 = "pergb2018"
+}
+
+resource "azurerm_sentinel_alert_rule_ms_security_incident" "example" {
+  name                       = "example-ms-security-incident-alert-rule"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
+  product_filter             = "Microsoft Cloud App Security"
+  display_name               = "example rule"
+  severity_filter            = ["High"]
+}
+
+
+data "azurerm_log_analytics_workspace" "example" {
+  name                = "log-analytics1"
+  resource_group_name = "my-resource-group"
+}
+
+data "azurerm_logic_app_workflow" "example" {
+  name                = "workflow1"
+  resource_group_name = "my-resource-group"
+}
+
+resource "azurerm_sentinel_automation_rule" "example" {
+  name                       = "example"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
+  display_name               = "examplerule"
+  conditions {
+    rule_name { 
+      contains = ["Rule1", "Rule2", "Rule3"] //make ability to all assign non array "All" for all rules
+      //not_contains = ["Rule4"] 
+      },
+    severity { 
+      equals = ["Medium", "High", "Low"] 
+      //not_equals= ["Informational"] 
+      }
+  }
+  actions {
+    run_playbook {
+      playbook = [data.azurerm_logic_app_workflow.example.id, "resource_id_here"] //One or multiple
+    },
+    add_tag {
+      tags = ["tag1", "tag2"]
+    }
+  }
+  order = 1
+  rule_expiration = "2021-05-15T10:00:00Z"
+  enabled = true
+}
+data "azurerm_log_analytics_workspace" "example" {
+  name                = "log-analytics1"
+  resource_group_name = "my-resource-group"
+}
+
+data "azurerm_logic_app_workflow" "example" {
+  name                = "workflow1"
+  resource_group_name = "my-resource-group"
+}
+
+resource "azurerm_sentinel_automation_rule" "example" {
+  name                       = "example"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
+  display_name               = "examplerule"
+  conditions {
+    rule_name { 
+      contains = ["Rule1", "Rule2", "Rule3"] //make ability to all assign non array "All" for all rules
+      //not_contains = ["Rule4"] 
+      },
+    severity { 
+      equals = ["Medium", "High", "Low"] 
+      //not_equals= ["Informational"] 
+      }
+  }
+  actions {
+    run_playbook {
+      playbook = [data.azurerm_logic_app_workflow.example.id, "resource_id_here"] //One or multiple
+    },
+    add_tag {
+      tags = ["tag1", "tag2"]
+    }
+  }
+  order = 1
+  rule_expiration = "2021-05-15T10:00:00Z"
+  enabled = true
+}
