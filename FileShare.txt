@@ -1,4 +1,4 @@
-dc5132fd-dacb-4515-bc7a-5c1df134fae1
+
 
 Join-AzStorageAccountForAuth `
         -ResourceGroupName $ResourceGroupName `
@@ -8,9 +8,9 @@ Join-AzStorageAccountForAuth `
         # OR USE A DISTINGUISHED NAME
         -OrganizationalUnitDistinguishedName "<ou-distinguishedname-here>" 
 
-+jsj2NjTfbHFCucpBlTOzYdW5ubz+G82mkav+PIU4onMUdnFVLtMAZ6zQ+HE3p837/7AhHByWVn2uoSH5lO47A==
 
-net use y: \\stplanesense.file.core.windows.net\fs-planesense
+
+net use y: \\StorageAccount.file.core.windows.net\fs-Fileshare
 
 /COPY:DATSO
 
